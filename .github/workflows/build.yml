@@ -1,0 +1,82 @@
+name: Build RPM and DEB Packages
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up RPM environment
+      run: sudo apt-get install -y rpm build-essential
+
+    - name: Build RPM package
+      run: |
+        mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+        cp $GITHUB_WORKSPACE/count_files.sh ~/rpmbuild/SOURCES/count_files.sh
+        cat << 'EOF' > ~/rpmbuild/SPECS/count_files.spec
+        Name:       count_files
+        Version:    1.0
+        Release:    1%{?dist}
+        Summary:    A script to count files in /etc directory
+        License:    GPL
+        Source0:    %{name}-%{version}.tar.gz
+
+        %description
+        This package includes a script to count files in the /etc directory.
+
+        %prep
+        %setup -q
+
+        %build
+
+        %install
+        install -D -m 0755 %{_sourcedir}/count_files.sh %{buildroot}/usr/bin/count_files
+
+        %files
+        /usr/bin/count_files
+
+        %changelog
+        EOF
+        cd ~/rpmbuild/SOURCES
+        tar -czvf count_files-1.0.tar.gz count_files.sh
+        cd ~
+        rpmbuild -ba ~/rpmbuild/SPECS/count_files.spec --define "_topdir ~/rpmbuild"
+        cp ~/rpmbuild/RPMS/x86_64/count_files-1.0-1.x86_64.rpm $GITHUB_WORKSPACE/
+
+    - name: Set up DEB environment
+      run: sudo apt-get install -y dpkg-dev debhelper
+
+    - name: Build DEB package
+      run: |
+        mkdir -p ~/debbuild/count_files-1.0/DEBIAN
+        mkdir -p ~/debbuild/count_files-1.0/usr/bin
+        cp $GITHUB_WORKSPACE/count_files.sh ~/debbuild/count_files-1.0/usr/bin/count_files
+        chmod +x ~/debbuild/count_files-1.0/usr/bin/count_files
+        cat << 'EOF' > ~/debbuild/count_files-1.0/DEBIAN/control
+        Package: count-files
+        Version: 1.0
+        Section: base
+        Priority: optional
+        Architecture: all
+        Maintainer: Your Name <your.email@example.com>
+        Description: A script to count files in /etc directory
+         This package includes a script to count files in the /etc directory.
+        EOF
+        dpkg-deb --build ~/debbuild/count_files-1.0
+        cp ~/debbuild/count_files-1.0.deb $GITHUB_WORKSPACE/
+
+    - name: Upload RPM and DEB packages as artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: packages
+        path: |
+          count_files-1.0-1.x86_64.rpm
+          count_files-1.0.deb
