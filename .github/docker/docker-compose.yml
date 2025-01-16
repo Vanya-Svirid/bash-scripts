@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  jenkins-master:
+    build: .
+    container_name: jenkins-master
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  jenkins-builder:
+    image: jenkinsci/jnlp-slave
+    container_name: jenkins-builder
+    environment:
+      - JENKINS_URL=http://jenkins-master:8080
+      - JENKINS_AGENT_WORKDIR=/home/jenkins/agent
+    volumes:
+      - agent_home:/home/jenkins/agent
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  jenkins_home:
+  agent_home:
